@@ -1,0 +1,13 @@
+[package]
+name = "xnode-controller"
+description = "Manage Xnode configuration based on a \"controller\" user"
+version = "1.0.0"
+edition = "2024"
+repository = "https://github.com/Openmesh-Network/xnode-controller"
+license = "MIT"
+
+[dependencies]
+futures = "0.3"
+log = "0.4"
+tokio = "1"
+xnode-manager-sdk = "1.0"
