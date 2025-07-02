@@ -10,34 +10,34 @@ use crate::utils::{XnodeControllerErrorInner, add_user_config, outside};
 
 pub trait XnodeController: Send + Sync {
     /// Get session to update Xnode
-    fn get_session(xnode: &Self) -> &xnode_manager_sdk::utils::Session;
+    fn get_session(&self) -> &xnode_manager_sdk::utils::Session;
 
     /// Decide who should be the current controller based on external data
-    fn check_controller(xnode: &Self) -> impl Future<Output = Option<String>> + Send;
+    fn check_controller(&self) -> impl Future<Output = Option<String>> + Send;
 
     // What OS config block should be set for the controller
-    fn controller_config(xnode: &Self, controller: String) -> String;
+    fn controller_config(&self, controller: String) -> String;
 
     // How to uniquely identify each Xnode
-    fn xnode_identifier(xnode: &Self) -> String {
-        Self::get_session(xnode).base_url.clone()
+    fn xnode_identifier(&self) -> String {
+        self.get_session().base_url.clone()
     }
 
     /// Set a new owner
     fn set_controller(
-        xnode: &Self,
+        &self,
         controller: Option<String>,
     ) -> impl Future<Output = Result<xnode_manager_sdk::os::SetOutput, Error>> + Send {
         async {
-            let session = Self::get_session(xnode);
-            let xnode_id = Self::xnode_identifier(xnode);
+            let session = self.get_session();
+            let xnode_id = self.xnode_identifier();
             let current_os =
                 xnode_manager_sdk::os::get(xnode_manager_sdk::os::GetInput::new(session))
                     .await
                     .map_err(Error::XnodeManagerSDKError)?;
 
             let new_controller_config = if let Some(controller) = controller {
-                Self::controller_config(xnode, controller)
+                self.controller_config(controller)
             } else {
                 "".to_string()
             };
@@ -97,8 +97,8 @@ pub async fn update_controllers<Xnode: XnodeController + 'static>(
         interval.tick().await;
 
         join_all(xnodes.lock().await.iter().map(async |xnode| {
-            let xnode_id = XnodeController::xnode_identifier(xnode);
-            let new_controller = XnodeController::check_controller(xnode).await;
+            let xnode_id = xnode.xnode_identifier();
+            let new_controller = xnode.check_controller().await;
             if let Some(data) = data.lock().await.get(&xnode_id) {
                 if new_controller == data.last_controller {
                     return;
@@ -106,7 +106,7 @@ pub async fn update_controllers<Xnode: XnodeController + 'static>(
             }
 
             log::info!("Setting controller on {xnode_id} to {new_controller:?}");
-            if let Err(e) = XnodeController::set_controller(xnode, new_controller.clone()).await {
+            if let Err(e) = xnode.set_controller(new_controller.clone()).await {
                 log::warn!("Error setting controller on {xnode_id} to {new_controller:?}: {e:?}");
             }
             data.lock()
